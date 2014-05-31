@@ -1,0 +1,171 @@
+package au.edu.uow.Networking;
+
+import au.edu.uow.ClientGUI.*;
+import au.edu.uow.QuestionLibrary.*;
+import java.net.*;
+import java.util.*;
+import java.io.*;
+
+/**
+ * @author Aaron Colin Foote acf502 4258770
+ * Date Last Modified: Thursday 17th October 2013
+ * File Description: Client.java for Assignment 4 of CSCI213
+ */
+
+public class Client
+{
+	//Connection setup values
+	private int port;
+	private String hostname;
+	private boolean isConnected;
+
+	//Connection and communications
+	private Socket socket;
+	private PrintWriter pout;	//output to server
+	private Scanner sin;		//input from server
+
+	/**
+	 * This method is a basic constructor for the client
+	 */
+	public Client()
+	{
+		port = 40213;			//default values
+		hostname = "localhost";
+		isConnected = false;
+	}
+
+	/**
+	 * This method is used to set a new port number
+	 */
+	public void setPort(int p)
+	{
+		port = p;
+	}
+
+	/**
+	 * This method is used to set a new hostname
+	 */
+	public void setHostname(String h)
+	{
+		hostname = h;
+	}
+
+	/**
+	 * This method is used to retrieve the current port number
+	 * @return port value of port
+	 */
+	public int getPort()
+	{
+		return port;
+	}
+
+	/**
+	 * This method is used to retrieve the current hostname
+	 * @return hostname string of hostname
+	 */
+	public String getHostname()
+	{
+		return hostname;
+	}
+
+	/**
+	 * This method is used to determine whether the connection is alive
+	 * @return isConnected to determine GUI action and output
+	 */
+	public boolean getIsConnected()
+	{
+		return isConnected;
+	}
+
+	/**
+	 * This method is used to setup a connection from the client to the server
+	 */
+	public void Connect(Student user)
+	{
+		try
+		{	
+			socket = new Socket (hostname, port);
+
+			//try statement would only continue if previous statement is successful
+			isConnected = true;
+			pout = new PrintWriter(socket.getOutputStream(), true);	//setup input and output to server
+			sin = new Scanner(socket.getInputStream());
+			Communicate("REGISTER " + user.getName());		//start connection, send REGISTER and username
+		}
+		catch (Exception e)
+		{
+			System.out.println("Make sure the server is running and try again");
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * This method is used to close all streams and socket connection, by passing on BYE to the communication with the server
+	 */
+	public void Disconnect()
+	{
+		Communicate("BYE");
+	}
+
+	/**
+	 * This method is used to send and receive messages from the server
+	 * @param userInput string value that holds the communication that the client is sending
+	 */
+	public void Communicate(String userInput)
+	{
+		if(userInput.startsWith("REGISTER")) {
+			pout.println(userInput);		//send out REGISTER and appended username
+			String returnString = sin.nextLine();	//receive reply from server
+		}
+		else if ("BYE".equals(userInput)) {		//send out BYE to server
+			pout.println(userInput);
+			try
+			{
+				isConnected = false;		//close streams and connection
+				pout.close();
+				sin.close();
+				socket.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 *  Requests the client's next due question
+	 * @return question
+	 */
+	public Question requestQuestion()
+	{
+		pout.println("GET QUESTION");
+		Object object = new Object();
+		
+		try {
+			ObjectInputStream objectInput = new ObjectInputStream(socket.getInputStream()); //Error Line!
+			object = objectInput.readObject();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return (Question) object;
+	}
+
+	/**
+	 *  Requests the vector holding the current uers to the client
+	 * @return users vector holding all the logged-in usernames
+	 */
+	public Vector<String> requestUsers()
+	{
+		pout.println("GET USERS");
+		Vector<String> users = new Vector<String>();
+		try {
+			ObjectInputStream objectInput = new ObjectInputStream(socket.getInputStream()); //Error Line!
+			Object object = objectInput.readObject();
+			users = (Vector<String>) object;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			return users;
+		}
+	}
+}

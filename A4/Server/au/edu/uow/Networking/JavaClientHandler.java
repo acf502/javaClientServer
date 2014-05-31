@@ -1,0 +1,109 @@
+package au.edu.uow.Networking;
+
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import au.edu.uow.QuestionLibrary.*;
+
+/**
+ * @author Aaron Colin Foote acf502 4258770
+ * Date Last Modified: Thursday 17th October 2013
+ * File Description: JavaClientHandler.java for Assignment 4 of CSCI213
+ */
+
+public class JavaClientHandler implements Runnable {
+
+	private Socket incoming;
+	private String hostname;
+	private QuestionLibrary questionsLib;
+	private static Vector<String> usernameList = new Vector<String>();	//vector used because of it's thread-safety
+	
+	/**
+	 * Constructor of client handler class
+	 * @param in The socket that holds the connection to the server
+	 * @param host The hostname of the server
+	 * @param qLib The prepared question library, allocated for each user
+	 */
+	public JavaClientHandler(Socket in, String host, QuestionLibrary qLib) {
+		this.incoming = in;
+		this.hostname = host;
+		this.questionsLib = qLib;
+	}
+	
+	/**
+	 * Controls the flow of the threaded class
+	 */		
+	public void run() {
+		// display client information at server
+		String remoteHost = incoming.getInetAddress().getHostName();
+		
+		List<Question> questions = questionsLib.makeQuiz(5);	//default quiz size of 5
+		int currentQuestion = 0;
+
+		try {
+			OutputStream outStream = incoming.getOutputStream();	//send information to the client with this stream
+			PrintWriter out = new PrintWriter(outStream, true /* autoFlush */);
+  
+			InputStream inStream = incoming.getInputStream();	//read client input to server
+			Scanner in = new Scanner(inStream);
+
+			boolean done = false;		//determine when to leave thread to finish
+			String name = "";		//to receive user's name
+
+			while (!done && in.hasNextLine()) {		//while connection is active
+				String line = in.nextLine();		//get client input
+				if (line.startsWith("REGISTER")) {	//if REGISTER
+
+					name = line.substring(9, line.length());	//get username passed to server
+					usernameList.add(name);				//add username to vector of active users
+					System.out.println(name + " registered");	//display server output of registered user
+					out.println("OK");				//send confirmation
+				}
+				else if (line.equals("GET QUESTION")) {	//if GET QUESTION
+
+					try {			//send next question from prepared list
+						ObjectOutputStream objectOutput = new ObjectOutputStream(incoming.getOutputStream());
+		        			objectOutput.writeObject(questions.get(currentQuestion));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					currentQuestion++;	//increment current question index
+				}
+				else if (line.equals("BYE")) {		//if BYE
+
+					for(int i = 0; i < usernameList.size(); i++) {	//remove current user from vector
+						if (usernameList.get(i).equals(name))
+							usernameList.removeElementAt(i);
+					}
+					System.out.println(name + " disconnected");	//output user's disconnection
+					done = true;					//permit loop to end
+					out.close();	//close I/O streams
+					in.close();
+				}
+				else if (line.equals("GET USERS")) {	//if GET USERS
+
+					try {		//send vector of users to client
+						ObjectOutputStream objectOutput = new ObjectOutputStream(incoming.getOutputStream());
+		        			objectOutput.writeObject(usernameList);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				else	//backup for unusual circumstances
+					out.println("Unknown text received");
+			}
+
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+		finally {
+			try {
+				incoming.close();	//close incoming socket
+			}
+			catch (IOException e) {  
+				e.printStackTrace();
+			}
+		}
+	}
+}
